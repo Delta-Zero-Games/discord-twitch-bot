@@ -1,0 +1,17 @@
+{
+  "metrics": {
+    "uptime": 0,
+    "lastRestart": 1730640635315,
+    "commandsProcessed": 0,
+    "messagesProcessed": 0,
+    "errors": 0,
+    "voiceTime": 0,
+    "lastHealthCheck": 1730641955508
+  },
+  "queues": {
+    "tts": [],
+    "followers": [],
+    "subscribers": [],
+    "gifters": []
+  }
+}

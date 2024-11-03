@@ -18,6 +18,10 @@ class WebSocketServer {
         console.log(`WebSocket server started on port ${CONFIG.websocket.port}`);
     }
 
+    isActive() {
+        return this.server !== null && this.server.clients.size > 0;
+    }
+
     handleConnection(ws) {
         // Generate client ID
         const clientId = Date.now().toString();

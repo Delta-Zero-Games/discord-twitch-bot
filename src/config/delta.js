@@ -91,95 +91,49 @@ Your response should:
     }
 };
 
-// Add conversation memory management
-const MEMORY_MANAGEMENT = {
-    // Structure for maintaining conversation context
-    conversation_context: {
-        max_age_hours: 24,
-        max_tokens: 100000,
-        format: `Previous conversations to maintain context and personality consistency:
-[Each entry contains timestamp, role (user/assistant), and content]
-
-{conversation_history}
-
-Remember to maintain consistent personality and reference previous interactions when relevant.`
-    },
-
-    // Memory types for different interactions
-    memory_types: {
-        general_conversation: {
-            importance: "high",
-            retention_priority: 1,
-            template: `{timestamp} | {role}: {content}`
-        },
-        bit_donations: {
-            importance: "high",
-            retention_priority: 1,
-            template: `{timestamp} | Bit Donation from {username} ({bits} bits): {message}
-Response: {response}`
-        },
-        channel_events: {
-            importance: "medium",
-            retention_priority: 2,
-            template: `{timestamp} | Event ({type}): {details}
-Response: {response}`
-        }
+// Helper function to get the base system prompt
+const getSystemPrompt = (baseType) => {
+    if (!SYSTEM_PROMPTS.hasOwnProperty(baseType)) {
+        console.error(`Invalid base type provided: ${baseType}`);
+        return undefined;
     }
+    return SYSTEM_PROMPTS[baseType];
 };
 
-// Helper function to combine prompts with conversation history
-const getCombinedPromptWithContext = (baseType, contextType, contextData, conversationHistory) => {
-    const base = SYSTEM_PROMPTS[`base_${baseType}`];
-    let contextPrompt = '';
-    let memoryPrompt = '';
-    
-    // Add context-specific prompt if provided
+// Helper function to get the context message prompt
+const getContextMessage = (contextType, contextData) => {
     if (contextType && SYSTEM_PROMPTS.contexts[contextType]) {
-        contextPrompt = SYSTEM_PROMPTS.contexts[contextType];
+        let contextPrompt = SYSTEM_PROMPTS.contexts[contextType];
         if (contextData) {
             Object.keys(contextData).forEach(key => {
-                contextPrompt = contextPrompt.replace(`{${key}}`, contextData[key]);
+                contextPrompt = contextPrompt.replace(new RegExp(`{${key}}`, 'g'), contextData[key]);
             });
         }
+        return contextPrompt;
     }
-    
-    // Add conversation history if provided
-    if (conversationHistory && conversationHistory.length > 0) {
-        memoryPrompt = MEMORY_MANAGEMENT.conversation_context.format.replace(
-            '{conversation_history}',
-            conversationHistory.map(entry => 
-                `[${entry.timestamp}] ${entry.role}: ${entry.content}`
-            ).join('\n')
-        );
+    if (contextType) {
+        console.error(`Invalid context type provided: ${contextType}`);
     }
-
-    return `${base}\n\n${contextPrompt}\n\n${memoryPrompt}`;
+    return '';
 };
 
-// Helper function to format new memory entries
-const formatMemoryEntry = (type, data) => {
-    const template = MEMORY_MANAGEMENT.memory_types[type].template;
-    const timestamp = new Date().toISOString();
-    
-    let entry = template;
-    Object.keys(data).forEach(key => {
-        entry = entry.replace(`{${key}}`, data[key]);
+// Helper function to get conversation history messages
+const getConversationHistoryMessages = (conversationHistory) => {
+    if (!conversationHistory || conversationHistory.length === 0) {
+        return [];
+    }
+
+    return conversationHistory.map(entry => {
+        return {
+            role: entry.role === 'assistant' ? 'assistant' : 'user',
+            content: entry.content
+        };
     });
-    entry = entry.replace('{timestamp}', timestamp);
-    
-    return {
-        type,
-        timestamp,
-        content: entry,
-        importance: MEMORY_MANAGEMENT.memory_types[type].importance,
-        retention_priority: MEMORY_MANAGEMENT.memory_types[type].retention_priority
-    };
 };
 
 module.exports = {
     SYSTEM_PROMPTS,
-    MEMORY_MANAGEMENT,
-    getCombinedPrompt,
-    getCombinedPromptWithContext,
-    formatMemoryEntry
+    getSystemPrompt,
+    getContextMessage,
+    getConversationHistoryMessages
 };
