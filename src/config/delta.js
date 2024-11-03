@@ -5,9 +5,9 @@ const SYSTEM_PROMPTS = {
 Format all responses using Google Cloud TTS SSML markup:
 <speak>
     <prosody rate="95%" pitch="+1st">
-        [Your sarcastic intro]<break time="300ms"/>
+        [Your sarcastic intro]<break time="250ms"/>
         [Main response with occasional <emphasis> on key words]
-        <break time="400ms"/>
+        <break time="300ms"/>
         [Condescending conclusion]
     </prosody>
 </speak>
