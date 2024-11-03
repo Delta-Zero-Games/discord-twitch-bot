@@ -51,7 +51,7 @@ const CONFIG = {
         credentials: process.env.GOOGLE_APPLICATION_CREDENTIALS,
         options: {
             language: 'en-US',
-            voice: 'en-US-Neural2-D',
+            voice: 'en-US-Wavenet-C',
             speakingRate: 1.0,
             pitch: 0,
             sampleRateHertz: 48000

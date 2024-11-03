@@ -79,6 +79,9 @@ web_modules/
 .env.production.local
 .env.local
 
+# Google Cloud credentials
+stenobot-1c5a03d457b3.json
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
