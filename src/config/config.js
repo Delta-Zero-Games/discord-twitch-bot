@@ -11,7 +11,8 @@ const CONFIG = {
         channels: {
             contextMemory: process.env.DISCORD_CONTEXT_MEMORY_CHANNEL,
             bitMessages: process.env.DISCORD_BIT_MESSAGES_CHANNEL,
-            botCommands: process.env.DISCORD_BOT_COMMANDS_CHANNEL
+            botCommands: process.env.DISCORD_BOT_COMMANDS_CHANNEL,
+            voice: process.env.DISCORD_VOICE_CHANNEL_ID
         },
         // Default voice settings
         voice: {
@@ -50,7 +51,7 @@ const CONFIG = {
         options: {
             language: 'en-US',
             voice: 'en-US-Wavenet-C',
-            speakingRate: 1.0,
+            speakingRate: 1.13,
             pitch: 0,
             sampleRateHertz: 48000
         }

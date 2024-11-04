@@ -7,6 +7,7 @@ class WebSocketServer {
         this.clients = new Map(); // Map to store client connections
         this.queueManager = queueManager; // For managing all queues
         this.deltaManager = deltaManager; // For handling Delta's responses
+        this.voiceManager = null;
     }
 
     initialize() {
@@ -20,6 +21,11 @@ class WebSocketServer {
 
     isActive() {
         return this.server !== null && this.server.clients.size > 0;
+    }
+
+    setVoiceManager(voiceManager) {
+        this.voiceManager = voiceManager;
+        console.log('Voice manager set successfully');
     }
 
     handleConnection(ws) {
@@ -48,7 +54,11 @@ class WebSocketServer {
                         });
                         break;
 
-                    case 'bits':
+                    case 'bot_control':
+                        await this.handleBotControl(message.action, ws);
+                        break;
+
+                    case 'tts':
                     case 'follows':
                     case 'subs':
                     case 'gifts':
@@ -65,6 +75,11 @@ class WebSocketServer {
             }
         });
 
+        // Send initial bot status
+        if (this.voiceManager) {
+            this.sendBotStatus(ws);
+        }
+
         // Handle disconnection
         ws.on('close', () => {
             this.clients.delete(clientId);
@@ -72,6 +87,58 @@ class WebSocketServer {
 
         // Store client connection
         this.clients.set(clientId, ws);
+    }
+
+    async handleBotControl(action, ws) {
+        if (!this.voiceManager) {
+            this.sendToClient(ws, {
+                type: 'error',
+                message: 'Voice manager not initialized'
+            });
+            return;
+        }
+
+        try {
+            const channelId = process.env.DISCORD_VOICE_CHANNEL_ID;
+            
+            if (action === 'connect') {
+                await this.voiceManager.connectToChannel(channelId);
+            } else if (action === 'disconnect') {
+                this.voiceManager.disconnect();
+            }
+
+            // Broadcast status to all clients
+            this.broadcastBotStatus();
+
+        } catch (error) {
+            console.error('Error handling bot control:', error);
+            this.sendToClient(ws, {
+                type: 'error',
+                message: `Failed to ${action} bot: ${error.message}`
+            });
+        }
+    }
+
+    sendBotStatus(ws) {
+        if (this.voiceManager) {
+            this.sendToClient(ws, {
+                type: 'bot_status',
+                connected: this.voiceManager.isConnected()
+            });
+        }
+    }
+
+    broadcastBotStatus() {
+        if (this.voiceManager) {
+            const status = {
+                type: 'bot_status',
+                connected: this.voiceManager.isConnected()
+            };
+
+            this.clients.forEach(ws => {
+                this.sendToClient(ws, status);
+            });
+        }
     }
 
     async handleTranscript(message) {
@@ -93,7 +160,7 @@ class WebSocketServer {
     async handleQueueCheck(type) {
         try {
             switch(type) {
-                case 'bits':
+                case 'tts':
                     await this.processNextTTSMessage();
                     break;
                 case 'follows':

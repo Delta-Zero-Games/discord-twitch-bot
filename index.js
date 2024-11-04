@@ -31,7 +31,7 @@ class DeltaBot {
         this.voiceManager = new VoiceManager(this.client);
         this.deltaManager = new DeltaManager(this.voiceManager);
 
-        // Initialize WebSocket server
+        // Initialize WebSocket server with null voiceManager
         this.wsServer = new WebSocketServer(this.queueManager, this.deltaManager);
 
         // Initialize state manager
@@ -66,6 +66,9 @@ class DeltaBot {
 
             // Initialize WebSocket server and other components after bot is ready
             this.client.once('ready', () => {
+                // Set the voice manager in WebSocket server after client is ready
+                this.wsServer.setVoiceManager(this.voiceManager);
+                
                 this.wsServer.initialize();
                 this.twitchClient = new TwitchClient(this.queueManager, this.deltaManager);
                 this.twitchClient.initialize();

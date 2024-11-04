@@ -32,6 +32,28 @@ class VoiceManager {
         });
     }
 
+    async connectToChannel(channelId) {
+        try {
+            // Get channel from ID
+            const channel = await this.client.channels.fetch(channelId);
+            
+            if (!channel) {
+                throw new Error('Voice channel not found');
+            }
+
+            if (!channel.isVoiceBased()) {
+                throw new Error('Specified channel is not a voice channel');
+            }
+
+            // Use existing joinChannel method
+            await this.joinChannel(channel);
+
+        } catch (error) {
+            console.error('Error connecting to voice channel:', error);
+            throw error;
+        }
+    }
+
     async joinChannel(channel) {
         try {
             // If already in this channel, don't rejoin
