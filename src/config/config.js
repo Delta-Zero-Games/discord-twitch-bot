@@ -35,8 +35,9 @@ const CONFIG = {
     // Claude Configuration
     claude: {
         apiKey: process.env.ANTHROPIC_API_KEY,
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         maxTokens: 1024,
+        temperature: 0.3,
         // Memory settings
         memory: {
             maxContextTokens: parseInt(process.env.MAX_CONTEXT_TOKENS, 10) || 20000,
@@ -51,7 +52,7 @@ const CONFIG = {
         options: {
             language: 'en-US',
             voice: 'en-US-Wavenet-C',
-            speakingRate: 1.13,
+            speakingRate: 1.1,
             pitch: 0,
             sampleRateHertz: 48000
         }
