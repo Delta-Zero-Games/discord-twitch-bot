@@ -1,12 +1,12 @@
 {
   "metrics": {
     "uptime": 0,
-    "lastRestart": 1734131482908,
+    "lastRestart": 1734136411667,
     "commandsProcessed": 0,
     "messagesProcessed": 0,
     "errors": 0,
     "voiceTime": 0,
-    "lastHealthCheck": 1734132082972
+    "lastHealthCheck": 1734136651680
   },
   "queues": {
     "tts": [],

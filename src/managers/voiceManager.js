@@ -16,6 +16,7 @@ class VoiceManager {
         this.client = client;
         this.connection = null;
         this.player = createAudioPlayer();
+        this.player.setMaxListeners(20);
         this.currentChannel = null;
         this.speaking = false;
 

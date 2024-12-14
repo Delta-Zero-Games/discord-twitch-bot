@@ -23,29 +23,123 @@ class DeltaManager {
     async processMessage(username, content, timestamp) {
         console.log(`processMessage called with username: ${username}, content: ${content}, timestamp: ${timestamp}`);
         try {
-            console.log('Calling getClaudeResponse');
-            // Get response from Claude
-            const response = await this.getClaudeResponse('base_ssml', null, {
+            // Get streaming response from Claude
+            const response = await this.streamClaudeResponse('base_plain', null, {
                 username,
                 content,
                 timestamp
             });
-            console.log('Received response from Claude:', response);
 
             // Add to conversation history
-            console.log('Adding to conversation history');
             this.addToConversationHistory('user', username, content, timestamp);
             this.addToConversationHistory('assistant', 'Delta', response, Date.now());
 
             // Generate and play TTS
-            console.log('Calling speakResponse');
-            await this.speakResponse(response);
-            console.log('Finished speakResponse');
+            //await this.speakResponse(response);
 
             return response;
         } catch (error) {
             console.error('Error processing message:', error);
             throw error;
+        }
+    }
+
+    async streamClaudeResponse(baseType, contextType, contextData) {
+        console.log('streamClaudeResponse called with:', { baseType, contextType, contextData });
+        try {
+            // Generate system prompt
+            const systemPrompt = getSystemPrompt(baseType);
+            if (!systemPrompt) {
+                throw new Error('Generated system prompt is empty');
+            }
+    
+            // Get context message if available
+            const contextMessage = getContextMessage(contextType, contextData);
+    
+            // Prepare messages array with history
+            let messages = getConversationHistoryMessages(this.getRecentConversationHistory());
+    
+            // Add context message if available
+            if (contextMessage) {
+                messages.push({ role: 'user', content: contextMessage });
+            }
+    
+            // Add current user message
+            if (contextData.content) {
+                messages.push({ role: 'user', content: contextData.content });
+            }
+    
+            // Initialize streaming message from Claude
+            const stream = await this.claude.messages.create({
+                model: CONFIG.claude.model,
+                max_tokens: CONFIG.claude.maxTokens,
+                system: systemPrompt,
+                messages: messages,
+                stream: true
+            });
+    
+            let fullResponse = '';
+            let currentChunk = '';
+            let sentenceQueue = [];
+            let ttsPromise = Promise.resolve();
+            let ttsStarted = false;
+    
+            for await (const chunk of stream) {
+                if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
+                    const text = chunk.delta.text;
+                    fullResponse += text;
+                    currentChunk += text;
+    
+                    // Look for natural sentence boundaries
+                    const sentenceEnders = ['. ', '! ', '? ', '; '];
+                    
+                    for (const ender of sentenceEnders) {
+                        if (currentChunk.includes(ender)) {
+                            const parts = currentChunk.split(ender);
+                            
+                            // Process all complete sentences except the last part
+                            for (let i = 0; i < parts.length - 1; i++) {
+                                const sentence = (parts[i] + ender).trim();
+                                if (sentence) {
+                                    sentenceQueue.push(sentence);
+                                    // Start TTS chain if this is the first sentence
+                                    if (!ttsStarted) {
+                                        ttsStarted = true;
+                                        ttsPromise = this.speakSentenceQueue(sentenceQueue);
+                                    }
+                                }
+                            }
+                            
+                            // Keep the incomplete part
+                            currentChunk = parts[parts.length - 1];
+                        }
+                    }
+                }
+            }
+    
+            // Add any remaining text to the queue
+            if (currentChunk.trim()) {
+                sentenceQueue.push(currentChunk.trim());
+            }
+    
+            // Wait for all TTS to complete
+            await ttsPromise;
+    
+            return fullResponse;
+        } catch (error) {
+            console.error('Error in streamClaudeResponse:', error);
+            throw error;
+        }
+    }
+    
+    async speakSentenceQueue(queue) {
+        while (queue.length > 0 || this.speaking) {
+            if (queue.length > 0 && !this.speaking) {
+                const sentence = queue[0];
+                await this.speakResponse(sentence);
+                queue.shift(); // Remove the sentence we just spoke
+            }
+            await new Promise(resolve => setTimeout(resolve, 100)); // Small delay to prevent CPU spinning
         }
     }
 
