@@ -2,6 +2,8 @@ const { CONFIG } = require('../config/config');
 const { SYSTEM_PROMPTS, getSystemPrompt, getContextMessage, getConversationHistoryMessages } = require('../config/delta');
 const { Anthropic } = require('@anthropic-ai/sdk');
 const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
+const { CartesiaClient } = require('@cartesia/cartesia-js');
+const { Readable } = require('stream');
 
 class DeltaManager {
     constructor(voiceManager) {
@@ -13,6 +15,11 @@ class DeltaManager {
         this.ttsClient = new TextToSpeechClient();
         this.conversationHistory = [];
         this.speaking = false;
+        this.cartesia = new CartesiaClient({
+            apiKey: CONFIG.sonic.apiKey
+        });
+        this.sonicWs = null;
+        this.currentContextId = null;
 
         // Start cleanup interval for conversation history
         setInterval(() => this.cleanupConversationHistory(), 
@@ -52,24 +59,39 @@ class DeltaManager {
             if (!systemPrompt) {
                 throw new Error('Generated system prompt is empty');
             }
+            console.log('System prompt generated');
     
             // Get context message if available
             const contextMessage = getContextMessage(contextType, contextData);
+            console.log('Context message:', contextMessage);
     
             // Prepare messages array with history
             let messages = getConversationHistoryMessages(this.getRecentConversationHistory());
+            console.log('History messages prepared:', messages);
     
-            // Add context message if available
+            // Add context and user messages if present
             if (contextMessage) {
                 messages.push({ role: 'user', content: contextMessage });
             }
-    
-            // Add current user message
             if (contextData.content) {
                 messages.push({ role: 'user', content: contextData.content });
             }
     
-            // Initialize streaming message from Claude
+            // Initialize Sonic WebSocket if needed
+            console.log('Testing Sonic connection...');
+            if (!this.sonicWs) {
+                this.sonicWs = this.cartesia.tts.websocket({
+                    container: "raw",
+                    encoding: "pcm_s16le",
+                    sampleRate: 48000
+                });
+                console.log('WebSocket instance created');
+                await this.sonicWs.connect();
+                console.log('Successfully connected to Sonic WebSocket');
+            }
+    
+            // Create Claude stream
+            console.log('Creating Claude stream...');
             const stream = await this.claude.messages.create({
                 model: CONFIG.claude.model,
                 max_tokens: CONFIG.claude.maxTokens,
@@ -77,60 +99,106 @@ class DeltaManager {
                 messages: messages,
                 stream: true
             });
+            console.log('Claude stream created');
     
+            this.currentContextId = `ctx_${Date.now()}`;
+            console.log('New context ID created:', this.currentContextId);
+    
+            let isFirstChunk = true;
             let fullResponse = '';
-            let currentChunk = '';
-            let sentenceQueue = [];
-            let ttsPromise = Promise.resolve();
-            let ttsStarted = false;
+            let currentSentence = '';
     
+            console.log('Starting stream processing...');
             for await (const chunk of stream) {
                 if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
                     const text = chunk.delta.text;
+                    console.log('Received text chunk:', text);
                     fullResponse += text;
-                    currentChunk += text;
+                    currentSentence += text;
     
-                    // Look for natural sentence boundaries
+                    // Sentence boundaries
                     const sentenceEnders = ['. ', '! ', '? ', '; '];
-                    
+    
                     for (const ender of sentenceEnders) {
-                        if (currentChunk.includes(ender)) {
-                            const parts = currentChunk.split(ender);
-                            
-                            // Process all complete sentences except the last part
+                        if (currentSentence.includes(ender)) {
+                            const parts = currentSentence.split(ender);
                             for (let i = 0; i < parts.length - 1; i++) {
                                 const sentence = (parts[i] + ender).trim();
                                 if (sentence) {
-                                    sentenceQueue.push(sentence);
-                                    // Start TTS chain if this is the first sentence
-                                    if (!ttsStarted) {
-                                        ttsStarted = true;
-                                        ttsPromise = this.speakSentenceQueue(sentenceQueue);
+                                    console.log('Processing sentence:', sentence);
+                                    const ttsOptions = {
+                                        contextId: this.currentContextId,
+                                        modelId: "sonic-preview",
+                                        voice: { mode: "id", id: CONFIG.sonic.voiceId },
+                                        transcript: sentence
+                                    };
+    
+                                    console.log(`Sending TTS request for sentence`);
+                                    // Always use send()
+                                    const audioResponse = await this.sonicWs.send(ttsOptions);
+    
+                                    const audioStream = new Readable({ read() {} });
+                                    console.log('Waiting for audio messages...');
+    
+                                    try {
+                                        for await (const message of audioResponse.events("message")) {
+                                            audioStream.push(message);
+                                        }
+                                    } catch (err) {
+                                        console.error('Error reading TTS messages:', err);
+                                        throw err;
+                                    } finally {
+                                        audioStream.push(null);
                                     }
+    
+                                    await this.voiceManager.playTTS(audioStream);
+                                    isFirstChunk = false;
+                                    console.log('Audio playback complete');
                                 }
                             }
-                            
-                            // Keep the incomplete part
-                            currentChunk = parts[parts.length - 1];
+                            currentSentence = parts[parts.length - 1];
                         }
                     }
                 }
             }
     
-            // Add any remaining text to the queue
-            if (currentChunk.trim()) {
-                sentenceQueue.push(currentChunk.trim());
-            }
+            // Handle any remaining text
+            if (currentSentence.trim()) {
+                console.log('Processing final remaining sentence:', currentSentence.trim());
+                const ttsOptions = {
+                    contextId: this.currentContextId,
+                    modelId: "sonic-preview",
+                    voice: { mode: "id", id: CONFIG.sonic.voiceId },
+                    transcript: currentSentence.trim()
+                };
     
-            // Wait for all TTS to complete
-            await ttsPromise;
+                console.log('Sending final TTS chunk with options:', ttsOptions);
+                // Always use send()
+                const audioResponse = await this.sonicWs.send(ttsOptions);
+    
+                const audioStream = new Readable({ read() {} });
+    
+                console.log('Waiting for audio messages...');
+                try {
+                    for await (const message of audioResponse.events("message")) {
+                        audioStream.push(message);
+                    }
+                } catch (err) {
+                    console.error('Error reading final TTS messages:', err);
+                    throw err;
+                } finally {
+                    audioStream.push(null);
+                }
+    
+                await this.voiceManager.playTTS(audioStream);
+            }
     
             return fullResponse;
         } catch (error) {
             console.error('Error in streamClaudeResponse:', error);
             throw error;
         }
-    }
+    }                
     
     async speakSentenceQueue(queue) {
         while (queue.length > 0 || this.speaking) {

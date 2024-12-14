@@ -58,6 +58,11 @@ const CONFIG = {
         }
     },
 
+    sonic: {
+        apiKey: process.env.CARTESIA_API_KEY,
+        voiceId: process.env.SONIC_VOICE_ID
+    },
+
     // WebSocket Configuration for Whisper Client
     websocket: {
         port: parseInt(process.env.WS_PORT, 10) || 3001,
@@ -116,7 +121,9 @@ const validateConfig = () => {
         'TWITCH_CLIENT_SECRET',
         'TWITCH_CHANNEL',
         'ANTHROPIC_API_KEY',
-        'GOOGLE_APPLICATION_CREDENTIALS'
+        'GOOGLE_APPLICATION_CREDENTIALS',
+        'CARTESIA_API_KEY',
+        'SONIC_VOICE_ID'
     ];
 
     const missing = required.filter(key => !process.env[key]);

@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.31.0",
+    "@cartesia/cartesia-js": "^2.1.0",
     "@discordjs/opus": "^0.9.0",
     "@discordjs/rest": "^2.4.0",
     "@discordjs/voice": "^0.17.0",
