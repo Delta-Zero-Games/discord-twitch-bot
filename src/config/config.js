@@ -7,14 +7,12 @@ const CONFIG = {
         clientId: process.env.DISCORD_CLIENT_ID,
         guildId: process.env.DISCORD_GUILD_ID,
         archiveChannelId: process.env.DISCORD_ARCHIVE_CHANNEL_ID,
-        // Channels for different purposes
         channels: {
             contextMemory: process.env.DISCORD_CONTEXT_MEMORY_CHANNEL,
             bitMessages: process.env.DISCORD_BIT_MESSAGES_CHANNEL,
             botCommands: process.env.DISCORD_BOT_COMMANDS_CHANNEL,
             voice: process.env.DISCORD_VOICE_CHANNEL_ID
         },
-        // Default voice settings
         voice: {
             selfDeaf: false,
             selfMute: false
@@ -28,7 +26,6 @@ const CONFIG = {
         accessToken: process.env.TWITCH_ACCESS_TOKEN,
         refreshToken: process.env.TWITCH_REFRESH_TOKEN,
         channel: process.env.TWITCH_CHANNEL,
-        // Threshold for TTS queue
         minBitsForTTS: parseInt(process.env.MIN_BITS_FOR_TTS, 10) || 500
     },
 
@@ -38,32 +35,38 @@ const CONFIG = {
         model: 'claude-3-5-haiku-20241022',
         maxTokens: 1024,
         temperature: 0.3,
-        // Memory settings
         memory: {
             maxContextTokens: parseInt(process.env.MAX_CONTEXT_TOKENS, 10) || 20000,
-            maxContextAge: parseInt(process.env.MAX_CONTEXT_AGE, 10) || 86400000, // 24 hours in ms
-            cleanupInterval: parseInt(process.env.CONTEXT_CLEANUP_INTERVAL, 10) || 3600000 // 1 hour in ms
+            maxContextAge: parseInt(process.env.MAX_CONTEXT_AGE, 10) || 86400000,
+            cleanupInterval: parseInt(process.env.CONTEXT_CLEANUP_INTERVAL, 10) || 3600000
         }
     },
 
-    // Google Cloud TTS Configuration
+    // TTS Configuration
     tts: {
         credentials: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+        usePremiumVoice: false, // Toggle between Premium and standard voice
         options: {
             language: 'en-US',
-            voice: 'en-US-Wavenet-C',
-            speakingRate: 1.1,
-            pitch: 0,
-            sampleRateHertz: 48000
+            standardVoice: {
+                name: 'en-US-Wavenet-C',
+                speakingRate: 1.1,
+                sampleRateHertz: 48000
+            },
+            premiumVoice: {
+                name: 'en-US-Journey-F',
+                model: 'premium', // Correct model type for Premium voices
+                sampleRateHertz: 48000
+            }
         }
     },
 
-    // WebSocket Configuration for Whisper Client
+    // WebSocket Configuration
     websocket: {
         port: parseInt(process.env.WS_PORT, 10) || 3001,
         heartbeat: {
-            interval: 30000, // 30 seconds
-            timeout: 10000   // 10 seconds
+            interval: 30000,
+            timeout: 10000
         }
     },
 
@@ -71,31 +74,29 @@ const CONFIG = {
     queues: {
         tts: {
             maxSize: 100,
-            timeout: 3600000 // 1 hour in ms
+            timeout: 3600000
         },
         followers: {
             batchSize: 10,
-            maxAge: 3600000  // 1 hour in ms
+            maxAge: 3600000
         },
         subscribers: {
             maxSize: 50,
-            timeout: 7200000 // 2 hours in ms
+            timeout: 7200000
         },
         gifts: {
             maxSize: 50,
-            timeout: 7200000 // 2 hours in ms
+            timeout: 7200000
         }
     },
 
-    // Response Timeouts
     timeouts: {
-        voiceConnection: 5000,    // 5 seconds
-        ttsGeneration: 10000,     // 10 seconds
-        claudeResponse: 15000,    // 15 seconds
-        wsConnection: 5000        // 5 seconds
+        voiceConnection: 5000,
+        ttsGeneration: 10000,
+        claudeResponse: 15000,
+        wsConnection: 5000
     },
 
-    // Development/Debug Options
     debug: {
         enabled: process.env.DEBUG_MODE === 'true',
         logLevel: process.env.DEBUG_LOG_LEVEL || 'info',
@@ -104,7 +105,6 @@ const CONFIG = {
     }
 };
 
-// Validation function for required environment variables
 const validateConfig = () => {
     const required = [
         'DISCORD_TOKEN',
@@ -120,15 +120,10 @@ const validateConfig = () => {
     ];
 
     const missing = required.filter(key => !process.env[key]);
-
     if (missing.length > 0) {
         throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
     }
-
     return true;
 };
 
-module.exports = {
-    CONFIG,
-    validateConfig
-};
+module.exports = { CONFIG, validateConfig };
